@@ -1,0 +1,28 @@
+<resources>
+    <string name="app_name">Moonlight</string>
+    <string name="on">ON</string>
+    <string name="off">OFF</string>
+    <string name="next">Next</string>
+    <string name="sync">Sync</string>
+    <string name="save">Save</string>
+    <string name="sync_startup">Sync startup</string>
+    <string name="sync_delay">Sync delay</string>
+    <string name="switch_delay">Switch delay</string>
+    <string name="save_delay">Save delay</string>
+    <string name="sun_white">SUN WHITE (warm white)</string>
+    <string name="red">RED (fixed color red)</string>
+    <string name="green">GREEN (fixed color green)</string>
+    <string name="blue">BLUE (fixed color blue)</string>
+    <string name="green_blue">GREEN-BLUE (fixed color green-blue)</string>
+    <string name="red_green">RED-GREEN (fixed color red-green)</string>
+    <string name="blue_red">BLUE-RED (fixed color blue-red)</string>
+    <string name="evening_sea">EVENING SEA (slow animation red-blue)</string>
+    <string name="evening_river">EVENING RIVER (slow animation red-green)</string>
+    <string name="riviera">RIVIERA (slow animation green-blue)</string>
+    <string name="neutral_white">NEUTRAL WHITE (cold white)</string>
+    <string name="rainbow">RAINBOW (slow animation blue-red-green)</string>
+    <string name="river_of_colors">RIVER OF COLORS (rainbow followed by four seasons)</string>
+    <string name="disco">DISCO (fast animation)</string>
+    <string name="four_seasons">FOUR SEASONS (slow animation red-blue-green-violet)</string>
+    <string name="party">PARTY (fast animation)</string>
+</resources>
