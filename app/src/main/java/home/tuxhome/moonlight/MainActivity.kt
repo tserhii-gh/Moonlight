@@ -1,7 +1,6 @@
 package home.tuxhome.moonlight
 
 import android.annotation.SuppressLint
-import android.app.ProgressDialog
 import android.content.SharedPreferences
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
@@ -9,7 +8,6 @@ import android.os.Handler
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
-import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.RadioButton
@@ -19,30 +17,43 @@ import androidx.appcompat.app.AlertDialog
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.activity_main.view.*
 import kotlinx.android.synthetic.main.loading_layout.view.*
-import kotlinx.android.synthetic.main.settings_layout.view.*
-import okhttp3.OkHttpClient
-import okhttp3.Request
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
+
+    //    val config_keys = arrayOf("sync_startup", "sync_delay", "switch_delay","save_delay")
+    val default_config = mapOf(
+        "sync_startup" to 3500,
+        "sync_delay" to 12500,
+        "switch_delay" to 1000,
+        "save_delay" to 12500
+    )
+
+    lateinit var config: Map<String, Int>
     val SYNC_STARTUP_CONST = 3500
     val SYNC_DELAY_CONST = 12500
-    val SWITCH_DELAY_CONST = 1500
+    val SWITCH_DELAY_CONST = 1000
     val SAVE_DELAY_CONST = 12500
     var SYNC_STARTUP = 0
     var SYNC_DELAY = 0
     var SWITCH_DELAY = 0
     var SAVE_DELAY = 0
     var APP_SETTINGS = "settings"
-    var LIGHTS_UP = false
+    var RELAY_STATE = false
+    var READY = false
     lateinit var pref: SharedPreferences
     lateinit var handler: Handler
+
     private var allControls = ArrayList<Button>()
 
     //    private var allProgs = ArrayList<RadioButton>()
     val TAG = "Moonlight"
-    val REALY_ON_URL = "http://192.168.2.101:10800/relay=on"
-    val REALY_OFF_URL = "http://tuxnote:10800/relay=off"
+    val REALY_ON_URL = "http://192.168.4.1/on"
+    val REALY_OFF_URL = "http://192.168.4.1/off"
+    val REALY_STATUS_URL = "http://192.168.4.1/status"
 
     val PROGS = arrayOf(
         "sun_white",
@@ -85,49 +96,75 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
+        val rc = RemoteControl()
         pref = getSharedPreferences(APP_SETTINGS, MODE_PRIVATE)
-        reloadTimerValues()
-        getAllControls(controls)
-
+//        reloadTimerValues()
+        config = loadConfigValues()
+//        Utils().getAllControls(controls, allControls)
+//        deactivateControls()
+        initControls()
+//        remoteRelaySTATUS()
 //        getAllProgs(progs_rb_group)
 
 
         handler = Handler()
-        button_off.isEnabled = false
-        button_next.isEnabled = false
-        button_sync.isEnabled = false
-        button_save.isEnabled = false
+//        initControls()
+//        button_off.isEnabled = false
+//        button_next.isEnabled = false
+//        button_sync.isEnabled = false
+//        button_save.isEnabled = false
+
+
         button_on.setOnClickListener {
-            enableAllProgs(progs_rb_group)
-            button_on.isEnabled = false
-            button_off.isEnabled = true
-            button_next.isEnabled = true
-            button_sync.isEnabled = true
-            button_save.isEnabled = true
+            GlobalScope.launch(Dispatchers.Main){
+                if (rc.relayOnCoroutine()){
+                    toggleControls()
+                    toggleAllProgs()
+                } else Toast.makeText(applicationContext, "Network Error", Toast.LENGTH_SHORT).show()
+            }
+//            val toast = Toast.makeText(applicationContext, "Network Error", Toast.LENGTH_SHORT)
+//            Thread {
+//                if (rc.relay_on()){
+//                    enableAllProgs(progs_rb_group)
+//                    button_on.isEnabled = false
+//                    button_off.isEnabled = true
+//                    button_next.isEnabled = true
+//                    button_sync.isEnabled = true
+//                    button_save.isEnabled = true
+//                } else
+//                {
+//                    toast.show()
+//                }
+////                Log.e(TAG, rc.relay_status().toString())
+//            }.start()
+
         }
+
         button_off.setOnClickListener {
-            disableAllProgs(progs_rb_group)
-            button_on.isEnabled = true
-            button_off.isEnabled = false
-            button_next.isEnabled = false
-            button_sync.isEnabled = false
-            button_save.isEnabled = false
+//            remoteRelayOFF()
+            Thread {
+                rc.relay_off()
+//                Log.e(TAG, rc.relay_status().toString())
+            }.start()
+
+            toggleControls()
+            toggleAllProgs()
         }
 
         button_save.setOnClickListener {
             allControls.forEach {
                 it.isEnabled = false
             }
-            LIGHTS_UP = false
+            RELAY_STATE = false
 //            Log.e(TAG, allProgs.size.toString())
-            disableAllProgs(progs_rb_group)
+//            disableAllProgs(progs_rb_group)
+            toggleAllProgs()
             val dlg = loadingDialog("Saving selected PROGRAM")
             dlg.show()
             handler.postDelayed({
                 Log.e(TAG, "Thread")
                 dlg.dismiss()
-                LIGHTS_UP = true
+                RELAY_STATE = true
                 button_on.isEnabled = false
                 button_off.isEnabled = true
                 button_next.isEnabled = true
@@ -137,7 +174,7 @@ class MainActivity : AppCompatActivity() {
 //                allButtons.forEach {
 //                    it.isEnabled = true
 //                }
-            }, SAVE_DELAY.toLong())
+            }, config.getValue("save_delay").toLong())
 
 
         }
@@ -146,11 +183,14 @@ class MainActivity : AppCompatActivity() {
             allControls.forEach {
                 it.isEnabled = false
             }
-            LIGHTS_UP = false
+            RELAY_STATE = false
+            Thread { rc.relay_off() }.start()
             handler.postDelayed({
+                Thread { rc.relay_on() }.start()
+
                 Log.e(TAG, "Thread")
                 switchProg(progs_rb_group)
-                LIGHTS_UP = true
+                RELAY_STATE = true
                 button_on.isEnabled = false
                 button_off.isEnabled = true
                 button_next.isEnabled = true
@@ -160,35 +200,18 @@ class MainActivity : AppCompatActivity() {
 //                allButtons.forEach {
 //                    it.isEnabled = true
 //                }
-            }, SWITCH_DELAY.toLong())
+            }, config.getValue("switch_delay").toLong())
         }
 
         if (progs_rb_group != null) {
             PROGS.forEach {
-
-//                if (it == "neutral_white"){
-//                    progs_rb_group.addView(
-//                        RadioButton(this).apply {
-//                            text = PROG_INFO[PROGS.indexOf(it)]
-////                        isEnabled = false
-////                            isClickable=false
-////                            isChecked = true
-//                            id = it
-//                        }
-//                    )}
-//                else {
                 progs_rb_group.addView(
                     RadioButton(this).apply {
                         text = PROG_INFO[PROGS.indexOf(it)]
-//                        isEnabled = false
-//                        isClickable=false
-//                            id = it
                         tag = it
                     }
                 )
-//                }
             }
-//            this.currentFocus
             progs_rb_group.addView(TextView(this).apply {
             })
             progs_rb_group.setOnCheckedChangeListener { group, checkedId ->
@@ -197,132 +220,78 @@ class MainActivity : AppCompatActivity() {
         }
 
         progs_rb_group.check(11)
-        disableAllProgs(progs_rb_group)
+//        disableAllProgs(progs_rb_group)
+        toggleAllProgs()
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.settings_menu, menu)
+        val ready = menu?.findItem(R.id.ready)
+        if (READY) ready?.isVisible = true
         return true
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         val id = item.getItemId()
         if (id == R.id.settigs_action) {
-//            Toast.makeText(this, "Item One Clicked", Toast.LENGTH_LONG).show()
-            val builder = AlertDialog.Builder(this)
-            val v = layoutInflater.inflate(R.layout.settings_layout, null)
-            builder.setView(v)
-            builder.setPositiveButton(R.string.save) { dialog, which ->
-                saveTimerValues(
-                    v.sync_start_value.text.toString(),
-                    v.sync_delay_value.text.toString(),
-                    v.switch_delay_value.text.toString(),
-                    v.save_delay_value.text.toString()
-                )
-                reloadTimerValues()
-                Toast.makeText(
-                    applicationContext,
-                    android.R.string.yes, Toast.LENGTH_SHORT
-                ).show()
-            }
 
-            builder.setNegativeButton(android.R.string.no) { dialog, which ->
-                Toast.makeText(
-                    applicationContext,
-                    android.R.string.no, Toast.LENGTH_SHORT
-                ).show()
-            }
-
-            builder.setNeutralButton("Reset") { dialog, which ->
-                resetTimerValues()
-                Toast.makeText(
-                    applicationContext,
-                    "Config saved with default values", Toast.LENGTH_SHORT
-                ).show()
-            }
-            reloadTimerValues()
-            initTimerValues(v)
-            builder.show()
+            Log.e(TAG, READY.toString())
+            SettingsDialog().show(supportFragmentManager, "SettingsDialog")
             return true
         }
         return super.onOptionsItemSelected(item)
     }
 
-
-    private fun reloadTimerValues() {
-//        if (pref.contains(APP_SETTINGS)){
-        SYNC_STARTUP = pref.getInt("sync_startup", SYNC_STARTUP_CONST)
-        SYNC_DELAY = pref.getInt("sync_delay", SYNC_DELAY_CONST)
-        SWITCH_DELAY = pref.getInt("switch_delay", SWITCH_DELAY_CONST)
-        SAVE_DELAY = pref.getInt("save_delay", SAVE_DELAY_CONST)
+    fun loadConfigValues(): MutableMap<String, Int> {
+        return default_config.mapValues { pref.getInt(it.key, default_config.getValue(it.key)) }.toMutableMap()
     }
 
-    private fun initTimerValues(v: View) {
-        v.sync_start_value.setText(SYNC_STARTUP.toString())
-        v.sync_delay_value.setText(SYNC_DELAY.toString())
-        v.switch_delay_value.setText(SWITCH_DELAY.toString())
-        v.save_delay_value.setText(SAVE_DELAY.toString())
-        // = SYNC_STARTUP
-    }
 
-    private fun saveTimerValues(st: String, sd: String, sw: String, sa: String) {
+//    private fun reloadTimerValues() {
+////        if (pref.contains(APP_SETTINGS)){
+//        val config_keys = arrayOf("sync_startup", "sync_delay", "switch_delay", "save_delay")
+//        SYNC_STARTUP = pref.getInt("sync_startup", SYNC_STARTUP_CONST)
+//        SYNC_DELAY = pref.getInt("sync_delay", SYNC_DELAY_CONST)
+//        SWITCH_DELAY = pref.getInt("switch_delay", SWITCH_DELAY_CONST)
+//        SAVE_DELAY = pref.getInt("save_delay", SAVE_DELAY_CONST)
+//    }
+
+    private fun saveTimerValues(m: Map<String, Int>){
         val editor = pref.edit()
-        editor.putInt("sync_startup", st.toInt())
-        editor.putInt("sync_delay", sd.toInt())
-        editor.putInt("switch_delay", sw.toInt())
-        editor.putInt("save_delay", sa.toInt())
-        editor.apply()
-    }
-
-    private fun resetTimerValues() {
-        val editor = pref.edit()
-        editor.putInt("sync_startup", SYNC_STARTUP_CONST)
-        editor.putInt("sync_delay", SYNC_DELAY_CONST)
-        editor.putInt("switch_delay", SWITCH_DELAY_CONST)
-        editor.putInt("save_delay", SAVE_DELAY_CONST)
-        editor.apply()
-        reloadTimerValues()
-    }
-
-    private fun getAllControls(parent: ViewGroup) {
-        for (i in 0 until parent.childCount) {
-            val child = parent.getChildAt(i)
-
-            if (child is Button) allControls.add(child)
-            else if (child is ViewGroup) getAllControls(child)
+        default_config.keys.forEach {
+            editor.putInt(it, m.getValue(it))
         }
+        editor.apply()
+        config = m
     }
+
+    fun toggleControls(){
+        val parent = controls // radio buttons group
+        for (index in 0 until parent.childCount)
+            parent.getChildAt(index).isEnabled = !parent.getChildAt(index).isEnabled
+    }
+
+    fun disableControls(){
+        val parent = controls // radio buttons group
+        for (index in 0 until parent.childCount)
+            parent.getChildAt(index).isEnabled = false
+    }
+
+    private fun toggleAllProgs() {
+        val parent = progs_rb_group // radio buttons group
+        for (index in 0 until parent.childCount)
+            parent.getChildAt(index).isEnabled = !parent.getChildAt(index).isEnabled
+    }
+
 
     private fun disableAllProgs(parent: ViewGroup) {
-        for (index in 0..parent.childCount - 1)
+        for (index in 0 until parent.childCount)
             parent.getChildAt(index).isEnabled = false
     }
 
     private fun enableAllProgs(parent: ViewGroup) {
-        for (index in 0..parent.childCount - 1)
+        for (index in 0 until parent.childCount)
             parent.getChildAt(index).isEnabled = true
-    }
-
-    private fun remoteRelayON() {
-        Thread {
-            val client = OkHttpClient()
-            val request = Request.Builder()
-                .url(REALY_ON_URL)
-                .build()
-            val resp = client.newCall(request).execute()
-            Log.e(TAG, resp.code.toString())
-        }.start()
-    }
-
-    private fun remoteRelayOFF() {
-        Thread {
-            val client = OkHttpClient()
-            val request = Request.Builder()
-                .url(REALY_OFF_URL)
-                .build()
-            val resp = client.newCall(request).execute()
-            Log.e(TAG, resp.code.toString())
-        }.start()
     }
 
     @SuppressLint("ResourceType")
@@ -345,4 +314,38 @@ class MainActivity : AppCompatActivity() {
 
         return builder.create()
     }
+
+    fun resetConfig() {
+        saveTimerValues(default_config)
+    }
+
+    fun saveConfig(config: Map<String, Int>) {
+        saveTimerValues(config)
+
+    }
+
+//    fun activateControls(){
+////        enableAllProgs(progs_rb_group)
+//        toggleAllProgs()
+//        button_on.isEnabled = false
+//        button_off.isEnabled = true
+//        button_next.isEnabled = true
+//        button_sync.isEnabled = true
+//        button_save.isEnabled = true
+//    }
+
+    fun initControls(){
+        val parent = controls // radio buttons group
+        for (index in 1 until parent.childCount)
+            parent.getChildAt(index).isEnabled = false
+    }
+//
+//    fun deactivateControls(){
+//        toggleAllProgs()
+//        button_on.isEnabled = true
+//        button_off.isEnabled = false
+//        button_next.isEnabled = false
+//        button_sync.isEnabled = false
+//        button_save.isEnabled = false
+//    }
 }

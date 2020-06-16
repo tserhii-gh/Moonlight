@@ -2,8 +2,15 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
+        android:id="@+id/ready"
+        app:showAsAction="ifRoom"
+        android:icon="@drawable/ic_remote_ready_48"
+        android:visible="false"
+        android:title="Ready"/>
+    <item
         android:id="@+id/settigs_action"
         android:icon="@drawable/ic_action_settings_48"
-        app:showAsAction="always"
+        app:showAsAction="ifRoom"
         android:title="Settings"/>
+
 </menu>

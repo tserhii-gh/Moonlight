@@ -17,7 +17,6 @@
             android:layout_height="match_parent"
             android:padding="5dp"
             android:text="@string/sync_startup"
-            android:textAlignment="center"
             android:textSize="18sp" />
 
         <EditText
@@ -40,7 +39,6 @@
             android:layout_height="match_parent"
             android:padding="5dp"
             android:text="@string/sync_delay"
-            android:textAlignment="center"
             android:textSize="18sp" />
 
         <EditText
@@ -65,7 +63,6 @@
             android:layout_height="match_parent"
             android:padding="5dp"
             android:text="@string/switch_delay"
-            android:textAlignment="center"
             android:textSize="18sp" />
 
         <EditText
@@ -90,7 +87,6 @@
             android:layout_height="match_parent"
             android:padding="5dp"
             android:text="@string/save_delay"
-            android:textAlignment="center"
             android:textSize="18sp" />
 
         <EditText
