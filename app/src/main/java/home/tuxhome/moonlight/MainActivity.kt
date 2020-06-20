@@ -22,9 +22,9 @@ import kotlinx.coroutines.launch
 class MainActivity : AppCompatActivity() {
 
     val defaultConfig = mapOf(
-        "sync_startup" to 3500,
-        "sync_delay" to 12500,
-        "switch_delay" to 1000,
+        "sync_startup" to 2000,
+        "sync_delay" to 12200,
+        "switch_delay" to 750,
         "save_delay" to 12500
     )
 
